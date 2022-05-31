@@ -1,6 +1,9 @@
 import netrc
+from re import X
 import tkinter as tk
-from turtle import heading
+from tracemalloc import start
+from turtle import color, heading
+from unicodedata import name
 import PIL
 from tkinter.constants import NS, NW, Y
 from tkinter.filedialog import askopenfilename
@@ -22,9 +25,13 @@ def openFile():
     txt_edit.delete("1.0", tk.END)
     txt_edit.insert(tk.END, filepath)
 
-frame1 = tk.Frame(window, width=200, height=100)
-txt_edit = tk.Text(frame1, padx=5, pady=5, width=10, height=5)
-txt_edit.pack()
+bigFrame = tk.Frame(window, width=200) #contain frame0 and frame1
+frame0 = tk.Frame(bigFrame, width=200)
+main_lable = tk.Label(frame0, text="Group 02 \n Nguyễn Thanh Tường-19110066 \n Phạm Hoàng Minh Mẫn-19110066 \n Huỳnh Công Đạt-19110114 \n Nguyễn Khang Duy-19110066", height=5)
+main_lable.pack(ipadx=150)
+frame1 = tk.Frame(bigFrame, width=200)
+txt_edit = tk.Text(frame1, padx=5, pady=5, height=1)
+txt_edit.pack(fill=tk.X, padx=5)
 
 #load yolo
 net=cv2.dnn.readNet("yolov3.weights", "yolov3.cfg")
@@ -34,12 +41,12 @@ classes = ["car"]
 #Select the object want to count
 
 with open("coco.names", "r") as f:
-    #load class list from coco
+    #load class name list from coco
     classes = [line.strip() for line in f.readlines()]
 
-layer_names = net.getLayerNames()
-output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
-colors = np.random.uniform(0, 255, size = (len(classes), 3))
+layer_names = net.getLayerNames()   # get layer_names from yolov3 (list)
+output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]     # get tracked object layer from layer_names
+colors = np.random.uniform(0, 255, size = (len(classes), 3))    # sign color for layer 
 frame_id = 0
 
 def getLink():
@@ -51,29 +58,25 @@ def getLink():
 cap = cv2.VideoCapture()
 #Is Used to URL
 
-def videoYoutube():
-    video = pafy.new(getLink())
-    best = video.getbest(preftype="mp4")
-    cap.open(best.url)
-    videoStream()
-
+starting_time = 0
 def showVideo():
     cap.open(getLink())
+    global starting_time
+    starting_time = time.time()
     videoStream()
-
 
 def videoStream():
     front = cv2.FONT_HERSHEY_PLAIN
-    stating_time = time.time()
+    global starting_time
     _, frame = cap.read()
     #frame is a vector array is capture base on default fps
     #cap.read() loop frame until the end or error, return bool if the frame is read correctly
 
-    global frame_id
+    global frame_id     # used to know which frame we are
     frame_id += 1
     height, width, channels = frame.shape
-    #channels is number of channel
-    cv2.imshow("source video", frame)
+    #channels is number of color channel
+    # cv2.imshow("result video", frame)
     
     blob = cv2.dnn.blobFromImage(frame, 0.00392, (416, 416), (0, 0, 0), True, crop = False)
     #convert image to blob image 
@@ -85,11 +88,12 @@ def videoStream():
     #Blod was used to output atr from image and change their size, Yolo accept 3 size:
     # 320x320: fast, less acc
     # 609x609: slower, more acc
-    # 416x416: medium - standart
+    # 416x416: medium - standard
     # 608x608: slow, more acc
 
     net.setInput(blob)
     outs = net.forward(output_layers)
+    # net.forward give a list of objects are detected with height, width, name, x y coordiante....
 
     class_ids = []
     confidences = []
@@ -116,7 +120,7 @@ def videoStream():
                 boxes.append([x, y, w, h])
                 confidences.append((float(confidence)))
                 class_ids.append(class_id)
-    #To avoid many box for one object, we use Non Maximum Suppersion (NMS)
+    #To avoid many box for one object, we use Non Maximum Suppresion (NMS)
     indexes = cv2.dnn.NMSBoxes(boxes, confidences, 0.8, 0.3)
     #Boxes, conf, con_threshold, nms_threshold
     #box: contain the cordinate of rectangle cover the object
@@ -134,50 +138,44 @@ def videoStream():
             confidence = confidences[i]
             color = colors[class_ids[i]]
             cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-            cv2.putText(frame, lable + " " + str(round(confidence, 2)), (x, y + 30), front, 3, color, 3)
+            cv2.putText(frame, lable + " " + str(round(confidence, 2)), (x, y + 30), front, 2, color, 3)
             #cv2.putText: sign name (persion, car...) for the object
 
     
     number.delete("1.0", tk.END)
     number.insert(tk.END, d)
     #Compute FPS 
-    elapsed_time = time.time() - stating_time
-    fps = frame_id / elapsed_time
-    cv2.putText(frame, "FPS: " + str(round(fps, 2)), (10,50), front, 4, (0,0,0), 3)
-    cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
+    elapsed_time = time.time() - starting_time   # time have runed
+    fps = (frame_id / elapsed_time)
+    cv2.putText(frame, "FPS: " + str(round(fps, 2)), (170,50), front, 2, (0,0,0), 2)     # show FPS (2 number after .)
+    cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     img = Image.fromarray(cv2image)
     imgtk = ImageTk.PhotoImage(image=img)
     la4.imgtk = imgtk
     la4.configure(image=imgtk)
     la4.after(10, videoStream)
 
-window.rowconfigure(0, minsize=50)
+window.rowconfigure([0,1,2], minsize=50)
 window.columnconfigure([0, 1, 2], minsize=50)
 la1 = tk.Label(frame1, text="Muc tuy chon: ", width=10)
 button1 = tk.Button(frame1, width=10, height=1, text="File video", pady=5, padx=5, command=openFile)
 button2 = tk.Button(frame1, width=10, height=1, text="Show video", pady=5, padx=5, command=showVideo)
-# button3 = tk.Button(frame1, width=10, height=1, text="Show video youtube", pady=5, padx=5, command=videoYoutube)
 la6 = tk.Label(frame1, text="Number ", padx=6, pady=6, width=10)
 number = tk.Text(frame1, padx=5, pady=5, width=10, height=1)
 
-frame2 = tk.Frame(window, width=350, height=400)
+frame2 = tk.Frame(window, width=350)
 
-canvas2 = tk.Canvas(frame2, width = 300, height = 300)
-la2 = tk.Label(frame2, text="Source Video", padx=5, pady=5, width=10, height=1)
-la4 = tk.Label(frame2, width=540, height=450)
+la2 = tk.Label(frame2, text="Result video", padx=5, width=10, height=1)
+la4 = tk.Label(frame2, width=540, height=450, pady=5)
 la4.grid()
-frame3 = tk.Frame(window, width=450, height=500)
-la5 = tk.Label(frame3, width=450, height=450)
-la3 = tk.Label(frame3, text="New Video", padx=5, pady=5, width=10, height=10)
-frame1.grid(row=0, column=0, sticky=NS)
-frame2.grid(row=0, column=2, sticky=NS)
-frame3.grid(row=0, column=1, sticky=NS)
-la1.pack(fill = tk.X)
-button1.pack(fill=tk.X)
-button2.pack(fill=tk.X)
-button3.pack(fill=tk.X)
-la6.pack(fill=tk.X)
-number.pack(fill=tk.X)
 la2.grid()
-la3.grid()
+bigFrame.grid(row=0, column=0, sticky=NS)
+frame2.grid(row=0, column=1, sticky=NS)
+frame0.grid(row=0, column=0, sticky=NS)
+frame1.grid(row=1, column=0, sticky=NS)
+la1.pack(fill = tk.X)
+button1.pack()
+button2.pack()
+la6.pack(fill=tk.X)
+number.pack()
 window.mainloop()
